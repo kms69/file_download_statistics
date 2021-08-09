@@ -1,0 +1,194 @@
+<?php
+
+/**
+ * @file
+ * Logs and displays file download statistics for a site.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+use Drupal\Core\Link;
+use Drupal\file_download_statistics\FileDownloadStatisticsCountResult;
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_help().
+ *
+ * @param $route_name
+ * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
+ *
+ * @return string
+ */
+function file_download_statistics_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.file_download_statistics':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The Download Statistics module shows you how often files are downloaded. This is useful in determining which files of your site are most popular.') . '</p>';
+      $output .= '<h3>' . t('Uses') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Displaying popular file downloads') . '</dt>';
+      $output .= '<dd>' . t('The module includes a <em>Popular file downloads</em> block that displays the most downloaded files today and for all time, and the last file downloaded. To use the block, enable <em>Count file downloads</em> on the <a href=":download-statistics-settings">Download Statistics page</a>, and then you can enable and configure the block on the <a href=":blocks">Block layout page</a>.', [':download-statistics-settings' => Url::fromRoute('file_download_statistics.settings'), ':blocks' => (\Drupal::moduleHandler()->moduleExists('block')) ? Url::fromRoute('block.admin_display') : '#']) . '</dd>';
+      $output .= '<dt>' . t('File Download counter') . '</dt>';
+      $output .= '<dd>' . t('The Download Statistics module includes a counter for each private file configured to be counted that increases whenever the file is downloaded. To use the counter, enable <em>Count file downloads</em> on the <a href=":download-statistics-settings">Download Statistics page</a>, select file display formatter type with Download Statistics and set the necessary <a href=":permissions">permissions</a> (<em>View file download statistics</em>) so that the counter is visible to the users.', [
+        ':download-statistics-settings' => Url::fromRoute('file_download_statistics.settings'),
+        ':permissions' => Url::fromRoute('user.admin_permissions', [], ['fragment' => 'module-download-statistics']),
+      ]) . '</dd>';
+      $output .= '</dl>';
+      return $output;
+
+    case 'file_download_statistics.settings':
+      return '<p>' . t('Settings for the File Download Statistics that Drupal will record on the site.') . '</p>';
+  }
+  return '';
+}
+
+/**
+ * Implements hook_cron().
+ */
+function file_download_statistics_cron() {
+  if (\Drupal::config('file_download_statistics.settings')->get('count_file_downloads')) {
+    $storage = \Drupal::service('file_download_statistics.storage');
+    $storage->resetDayCount();
+    $max_total_count = $storage->maxTotalCount();
+    \Drupal::state()
+      ->set('file_download_statistics.download_counter_scale', 1.0 / max(1.0, $max_total_count));
+  }
+}
+
+/**
+ * Prepares variables for file link templates.
+ *
+ * Default template: file-link.html.twig.
+ *
+ * @param array $variables
+ *   An associative array containing:
+ *   - file: A file object to which the link will be created.
+ *   - icon_directory: (optional) A path to a directory of icons to be used for
+ *     files. Defaults to the value of the "icon.directory" variable.
+ *   - description: A description to be displayed instead of the filename.
+ *   - attributes: An associative array of attributes to be placed in the a tag.
+ */
+function file_download_statistics_preprocess_file_link(array &$variables) {
+  $file = $variables['file'];
+  if ($file->countDownloads) {
+    // Add the prefix.
+    $file_uri = $file->getFileUri();
+    $file_uri = str_replace('private://', 'private://download-counter/', $file_uri);
+    $url = file_create_url($file_uri);
+    $mime_type = $file->getMimeType();
+    $options['attributes']['type'] = $mime_type . '; length=' . $file->getSize();
+    // Use the description as the link text if available.
+    if (empty($variables['description'])) {
+      $link_text = $file->getFilename();
+    }
+    else {
+      $link_text = $variables['description'];
+      $options['attributes']['title'] = $file->getFilename();
+    }
+    $variables['link'] = Link::fromTextAndUrl($link_text, Url::fromUri($url, $options));
+  }
+}
+
+/**
+ * Retrieves a file's "download statistics".
+ *
+ * @param int $id
+ *   The file ID.
+ *
+ * @return mixed
+ *   Array with download statistics if successful, FALSE otherwise.
+ */
+function file_download_statistics_get($id) {
+  if ($id > 0) {
+    /** @var \Drupal\file_download_statistics\FileDownloadStatisticsCountResult $statistics */
+    $statistics = \Drupal::service('file_download_statistics.storage')->fetchDownload($id);
+
+    // For backwards compatibility, return FALSE if an invalid node ID was
+    // passed in.
+    if (!($statistics instanceof DownloadStatisticsCountResult)) {
+      return FALSE;
+    }
+    return [
+      'totalcount' => $statistics->getTotalCount(),
+      'daycount' => $statistics->getDayCount(),
+      'timestamp' => $statistics->getTimestamp(),
+      'uid' => $statistics->getUserId(),
+    ];
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_predelete() for file entities.
+ */
+function file_download_statistics_file_predelete(EntityInterface $file) {
+  // Clean up statistics table when file is deleted.
+  $id = $file->id();
+  return \Drupal::service('file_download_statistics.storage')->deleteDownloads($id);
+}
+
+/**
+ * Implements hook_ranking().
+ */
+function file_download_statistics_ranking() {
+  if (\Drupal::config('file_download_statistics.settings')->get('count_file_downloads')) {
+    return [
+      'downloads' => [
+        'title' => t('Number of downloads'),
+        'join' => [
+          'type' => 'LEFT',
+          'table' => 'file_download_statistics',
+          'alias' => 'file_download_statistics',
+          'on' => 'file_download_statistics.fid = i.sid',
+        ],
+        // Inverse law that maps the highest downloads count on the site to 1
+        // and 0 to 0. Note that the ROUND here is necessary for PostgreSQL
+        // and SQLite in order to ensure that the :download_statistics_scale
+        // argument is treated as a numeric type, because the PostgreSQL
+        // PDO driver sometimes puts values in as strings instead of numbers
+        // in complex expressions like this.
+        'score' => '2.0 - 2.0 / (1.0 + file_download_statistics.totalcount * (ROUND(:download_statistics_scale, 4)))',
+        'arguments' => [':download_statistics_scale' => \Drupal::state()->get('file_download_statistics.download_counter_scale') ?: 0],
+      ],
+    ];
+  }
+  return [];
+}
+
+/**
+ * Implements hook_preprocess_HOOK() for block templates.
+ */
+function file_download_statistics_preprocess_block(&$variables) {
+  if ($variables['configuration']['provider'] == 'file_download_statistics') {
+    $variables['attributes']['role'] = 'navigation';
+  }
+}
+
+/**
+ * Implements hook_block_alter().
+ *
+ * Removes the "popular" block from display if the module is not configured
+ * to count file downloads.
+ */
+function file_download_statistics_block_alter(&$definitions) {
+  $download_statistics_count = \Drupal::config('file_download_statistics.settings')->get('count_file_downloads');
+  if (!$download_statistics_count) {
+    unset($definitions['file_download_statistics_popular_block']);
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function file_download_statistics_form_views_ui_config_item_form_alter(&$form, FormStateInterface $form_state) {
+  // Remove the field formatter options based on settings.
+  if (!\Drupal::config('file_download_statistics.settings')->get('count_file_downloads')) {
+    foreach ($form["options"]["type"]["#options"] as $plugin_id => $label) {
+      if ($plugin_id == 'file_uri_download_count' || $plugin_id == 'counted_downloads_file') {
+        unset($form["options"]["type"]["#options"][$plugin_id]);
+      }
+    }
+  }
+}

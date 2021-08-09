@@ -1,0 +1,26 @@
+# Schema for the configuration files of the file_download_statistics module.
+
+file_download_statistics.settings:
+  type: config_object
+  label: 'File Download Statistics settings'
+  mapping:
+    count_file_downloads:
+      type: integer
+      label: 'Count file downloads'
+    display_max_age:
+      type: integer
+      label: 'How long any download statistics may be cached, i.e. the refresh interval'
+
+block.settings.file_download_statistics_popular_block:
+  type: block_settings
+  label: 'Popular file downloads block settings'
+  mapping:
+    top_day_num:
+      type: integer
+      label: 'Number of day\s top file downloads to display'
+    top_all_num:
+      type: integer
+      label: 'Number of all time file downloads to display'
+    top_last_num:
+      type: integer
+      label: 'Number of most recent file downloads to display'

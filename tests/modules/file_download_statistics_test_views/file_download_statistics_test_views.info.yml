@@ -1,0 +1,14 @@
+name: 'File Download Statistics test views'
+type: module
+description: 'Provides default views for Download Statistics tests.'
+package: Testing
+# version: VERSION
+core: 8.x
+dependencies:
+  - file_download_statistics
+  - views
+
+# Information added by Drupal.org packaging script on 2020-09-17
+version: '1.0.0-beta1'
+project: 'file_download_statistics'
+datestamp: 1600377583

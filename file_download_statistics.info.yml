@@ -1,0 +1,11 @@
+name: File download statistics ( file download counting)
+type: module
+description: 'Statistics for private and public file'
+package: Administration
+core_version_requirement: ^8.8 || ^9
+configure: file_download_statistics.settings
+dependencies:
+  - node
+  - field
+  - file
+

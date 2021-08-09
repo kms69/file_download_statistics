@@ -1,0 +1,11 @@
+services:
+  file_download_statistics.storage:
+    class: Drupal\file_download_statistics\FileDownloadStatisticsDatabaseStorage
+    arguments: ['@database', '@state', '@request_stack', '@current_user']
+    tags:
+      - { name: backend_overridable }
+  file_download_statistics.route_subscriber:
+    class: Drupal\file_download_statistics\Routing\FileDownloadAlterRouteSubscriber
+    arguments: ['@config.factory']
+    tags:
+      - { name: event_subscriber }

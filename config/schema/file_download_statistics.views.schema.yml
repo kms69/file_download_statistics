@@ -1,0 +1,9 @@
+# Schema for the views plugins of the File Download Statistics module.
+
+views.field.file_download_statistics_numeric:
+  type: views.field.numeric
+  label: 'Numeric values from the File Download Statistics module'
+
+views.field.file_download_statistics_timestamp:
+  type: views.field.date
+  label: 'The most recent time the file has been downloaded'

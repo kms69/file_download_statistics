@@ -1,0 +1,7 @@
+file_download_statistics.settings:
+  path: '/admin/config/system/file-download-statistics'
+  defaults:
+    _form: 'Drupal\file_download_statistics\FileDownloadStatisticsSettingsForm'
+    _title: 'File Download Statistics Configs'
+  requirements:
+    _permission: 'administer download statistics'

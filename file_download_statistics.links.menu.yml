@@ -1,0 +1,6 @@
+file_download_statistics.settings:
+  title: File Download Statistics
+  description: 'Configure the logging of file download statistics.'
+  route_name: file_download_statistics.settings
+  parent: system.admin_config_system
+  weight: -15

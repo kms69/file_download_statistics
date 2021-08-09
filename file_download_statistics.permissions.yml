@@ -1,0 +1,4 @@
+administer download statistics:
+  title: 'Administer file download statistics'
+view file download statistics:
+  title: 'View file download statistics'

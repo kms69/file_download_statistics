@@ -1,0 +1,65 @@
+<?php
+
+/**
+ * @file
+ * Install and update functions for the File Download Statistics module.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function file_download_statistics_uninstall() {
+  // Remove states.
+  \Drupal::state()->delete('file_download_statistics.download_counter_scale');
+  \Drupal::state()->delete('file_download_statistics.day_timestamp');
+}
+
+/**
+ * Implements hook_schema().
+ */
+function file_download_statistics_schema() {
+  $schema['file_download_statistics'] = [
+    'description' => 'Access download statistics for {file}s.',
+    'fields' => [
+      'fid' => [
+        'description' => 'The {file_managed}.fid for these download statistics.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+      'totalcount' => [
+        'description' => 'The total number of times the {file} has been downloaded.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 1,
+        'size' => 'big',
+      ],
+      'daycount' => [
+        'description' => 'The total number of times the {file} has been downloaded today.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 1,
+        'size' => 'medium',
+      ],
+      'timestamp' => [
+        'description' => 'The most recent time the {file} has been downloaded.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ],
+      'uid' => array(
+        'description' => 'The {user}.uid of user who made the most recent download.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ],
+    'primary key' => ['fid'],
+  ];
+
+  return $schema;
+}
